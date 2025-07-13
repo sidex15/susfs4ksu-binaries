@@ -1,0 +1,70 @@
+name: build susfs_userspace
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: grab ndk
+        run: |
+          curl -L https://dl.google.com/android/repository/android-ndk-r23b-linux.zip -o ndk-linux.zip
+          unzip ndk-linux.zip
+
+      - name: grab zig
+        run: |
+          curl -L https://ziglang.org/download/0.14.1/zig-x86_64-linux-0.14.1.tar.xz -o zig.tar.xz
+          tar -xf zig.tar.xz
+          mv zig-* zig
+
+      - name: grab sstrip from ELFkickers
+        run: |
+          curl -L https://www.muppetlabs.com/~breadbox/pub/software/ELFkickers-3.2.tar.gz -o sstrip.tar.gz
+          tar xf sstrip.tar.gz
+          make -C ELFkickers-3.2 sstrip
+          cp ELFkickers-3.2/sstrip/sstrip .
+
+      - name: compile via zigcc
+        run: |
+          ls -la ; pwd
+          echo "for now only aarch64 is built"
+          chmod +x sstrip
+
+          mkdir binaries
+          
+          ./zig/zig cc -target aarch64-linux -s -Oz 152/gki/main.c -static -s -Wl,--gc-sections -o binaries/152_gki -I ./android-ndk-r23b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include
+          ./zig/zig cc -target aarch64-linux -s -Oz 152/ngki/main.c -static -s -Wl,--gc-sections -o binaries/152_ngki -I ./android-ndk-r23b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include
+
+          ./zig/zig cc -target aarch64-linux -s -Oz 153/gki/main.c -static -s -Wl,--gc-sections -o binaries/153_gki -I ./android-ndk-r23b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include
+          ./zig/zig cc -target aarch64-linux -s -Oz 153/ngki/main.c -static -s -Wl,--gc-sections -o binaries/153_ngki -I ./android-ndk-r23b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include
+
+          ./zig/zig cc -target aarch64-linux -s -Oz 154/gki/main.c -static -s -Wl,--gc-sections -o binaries/154_gki -I ./android-ndk-r23b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include
+          ./zig/zig cc -target aarch64-linux -s -Oz 154/ngki/main.c -static -s -Wl,--gc-sections -o binaries/154_ngki -I ./android-ndk-r23b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include
+
+          ./zig/zig cc -target aarch64-linux -s -Oz 155/gki/main.c -static -s -Wl,--gc-sections -o binaries/155_gki -I ./android-ndk-r23b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include
+          ./zig/zig cc -target aarch64-linux -s -Oz 155/ngki/main.c -static -s -Wl,--gc-sections -o binaries/155_ngki -I ./android-ndk-r23b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include
+
+          ./zig/zig cc -target aarch64-linux -s -Oz 156/gki/main.c -static -s -Wl,--gc-sections -o binaries/156_gki -I ./android-ndk-r23b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include
+          
+          ./zig/zig cc -target aarch64-linux -s -Oz 157/gki/main.c -static -s -Wl,--gc-sections -o binaries/157_gki -I ./android-ndk-r23b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include
+          ./zig/zig cc -target aarch64-linux -s -Oz 157/ngki/main.c -static -s -Wl,--gc-sections -o binaries/157_ngki -I ./android-ndk-r23b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include
+
+          ./zig/zig cc -target aarch64-linux -s -Oz 158/gki/main.c -static -s -Wl,--gc-sections -o binaries/158_gki -I ./android-ndk-r23b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include
+          ./zig/zig cc -target aarch64-linux -s -Oz 158/ngki/main.c -static -s -Wl,--gc-sections -o binaries/158_ngki -I ./android-ndk-r23b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include          
+          
+          ./zig/zig cc -target aarch64-linux -s -Oz 159/gki/main.c -static -s -Wl,--gc-sections -o binaries/159_gki -I ./android-ndk-r23b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include
+          ./zig/zig cc -target aarch64-linux -s -Oz 159/ngki/main.c -static -s -Wl,--gc-sections -o binaries/159_ngki -I ./android-ndk-r23b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include          
+
+          upx --ultra-brute binaries/*
+          for i in binaries/*; do ./sstrip $i ; done;
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: susfs_binaries
+          path: binaries/
+
