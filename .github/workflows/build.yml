@@ -41,31 +41,16 @@ jobs:
             mkdir -p binaries/$i/non-gki/
           done
           
-          ./zig/zig cc -target aarch64-linux -s -Oz 152/gki/main.c -static -s -Wl,--gc-sections -o binaries/152/gki/ksu_susfs_arm64 -I ./android-ndk-r23b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include
-          ./zig/zig cc -target aarch64-linux -s -Oz 152/ngki/main.c -static -s -Wl,--gc-sections -o binaries/152/non-gki/ksu_susfs_arm64 -I ./android-ndk-r23b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include
+          for i in {152..159}; do
+            # Compile GKI version
+            ./zig/zig cc -target aarch64-linux -s -Oz $i/gki/main.c -static -s -Wl,--gc-sections -o binaries/$i/gki/ksu_susfs_arm64 -I ./android-ndk-r23b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include
+            
+            # Compile non-GKI version
+            ./zig/zig cc -target aarch64-linux -s -Oz $i/ngki/main.c -static -s -Wl,--gc-sections -o binaries/$i/non-gki/ksu_susfs_arm64 -I ./android-ndk-r23b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include
+          done
 
-          ./zig/zig cc -target aarch64-linux -s -Oz 153/gki/main.c -static -s -Wl,--gc-sections -o binaries/153/gki/ksu_susfs_arm64 -I ./android-ndk-r23b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include
-          ./zig/zig cc -target aarch64-linux -s -Oz 153/ngki/main.c -static -s -Wl,--gc-sections -o binaries/153/non-gki/153_ngki -I ./android-ndk-r23b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include
-
-          ./zig/zig cc -target aarch64-linux -s -Oz 154/gki/main.c -static -s -Wl,--gc-sections -o binaries/154/gki/ksu_susfs_arm64 -I ./android-ndk-r23b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include
-          ./zig/zig cc -target aarch64-linux -s -Oz 154/ngki/main.c -static -s -Wl,--gc-sections -o binaries/154/non-gki/ksu_susfs_arm64 -I ./android-ndk-r23b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include
-
-          ./zig/zig cc -target aarch64-linux -s -Oz 155/gki/main.c -static -s -Wl,--gc-sections -o binaries/155/gki/ksu_susfs_arm64 -I ./android-ndk-r23b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include
-          ./zig/zig cc -target aarch64-linux -s -Oz 155/ngki/main.c -static -s -Wl,--gc-sections -o binaries/155/non-gki/ksu_susfs_arm64 -I ./android-ndk-r23b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include
-
-          ./zig/zig cc -target aarch64-linux -s -Oz 156/gki/main.c -static -s -Wl,--gc-sections -o binaries/156/ksu_susfs_arm64 -I ./android-ndk-r23b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include
-          
-          ./zig/zig cc -target aarch64-linux -s -Oz 157/gki/main.c -static -s -Wl,--gc-sections -o binaries/157/gki/ksu_susfs_arm64 -I ./android-ndk-r23b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include
-          ./zig/zig cc -target aarch64-linux -s -Oz 157/ngki/main.c -static -s -Wl,--gc-sections -o binaries/157/non-gki/ksu_susfs_arm64 -I ./android-ndk-r23b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include
-
-          ./zig/zig cc -target aarch64-linux -s -Oz 158/gki/main.c -static -s -Wl,--gc-sections -o binaries/158/gki/ksu_susfs_arm64 -I ./android-ndk-r23b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include
-          ./zig/zig cc -target aarch64-linux -s -Oz 158/ngki/main.c -static -s -Wl,--gc-sections -o binaries/158/non-gki/ksu_susfs_arm64 -I ./android-ndk-r23b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include          
-          
-          ./zig/zig cc -target aarch64-linux -s -Oz 159/gki/main.c -static -s -Wl,--gc-sections -o binaries/159/gki/ksu_susfs_arm64 -I ./android-ndk-r23b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include
-          ./zig/zig cc -target aarch64-linux -s -Oz 159/ngki/main.c -static -s -Wl,--gc-sections -o binaries/159/non-gki/ksu_susfs_arm64 -I ./android-ndk-r23b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include          
-
-          upx --ultra-brute binaries/*
-          for i in binaries/*; do ./sstrip $i ; done;
+          upx --ultra-brute binaries/*/*/ksu_susfs_arm64
+          for i in binaries/*/*/ksu_susfs_arm64; do ./sstrip $i ; done;
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
