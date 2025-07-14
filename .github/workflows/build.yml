@@ -37,7 +37,7 @@ jobs:
           chmod +x sstrip
 
           for i in {152..159}; do
-            if [ $1 -eq 156 ]; then
+            if [ $i -eq 156 ]; then
               mkdir -p binaries/$i/gki/
             else
               mkdir -p binaries/$i/gki/
@@ -46,7 +46,7 @@ jobs:
           done
           
           for i in {152..159}; do
-            if [ $1 -eq 156 ]; then
+            if [ $i -eq 156 ]; then
               # Compile GKI version
               ./zig/zig cc -target aarch64-linux -s -Oz $i/gki/main.c -static -s -Wl,--gc-sections -o binaries/$i/gki/ksu_susfs_arm64 -I ./android-ndk-r23b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include
             else
