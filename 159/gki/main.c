@@ -21,6 +21,7 @@
 #define KERNEL_SU_OPTION 0xDEADBEEF
 
 #define CMD_SUSFS_ADD_SUS_PATH 0x55550
+#define CMD_SUSFS_ADD_SUS_PATH_LOOP 0x55553
 #define CMD_SUSFS_SET_ANDROID_DATA_ROOT_PATH 0x55551
 #define CMD_SUSFS_SET_SDCARD_ROOT_PATH 0x55552
 #define CMD_SUSFS_ADD_SUS_MOUNT 0x55560
@@ -218,6 +219,10 @@ static void print_help(void) {
 	log("         |--> To fix the leak of app path after /sdcard/Android/data from syscall, please run ksu_susfs set_android_data_root_path </path/of/sdcard/Android/data> first\n");
 	log("         |--> To hide paths after /sdcard/, please run ksu_susfs set_sdcard_root_path </root/dir/of/sdcard> first\n");
 	log("\n");
+	log("        add_sus_path_loop </path/not/inside/sdcard>\n");
+	log("         |--> The only different to add_sus_path is the added sus_path will be flagged as SUS_PATH again per each zygote spawned non-rooted process\n");
+	log("         |--> This applies to regular path (not including path in /sdcard/) only\n");
+	log("\n");
 	log("        set_android_data_root_path </root/dir/of/sdcard/Android/data>\n");
 	log("         |--> To fix the leak of app path after /sdcard/Android/data/ from syscall, first you need to tell the susfs kernel where is the actual path '/sdcard/Android/data' located, as it may vary on different phones\n");
 	log("         |--> Effective for no root access granted user apps only\n");
@@ -339,7 +344,21 @@ int main(int argc, char *argv[]) {
 		prctl(KERNEL_SU_OPTION, CMD_SUSFS_ADD_SUS_PATH, &info, NULL, &error);
 		PRT_MSG_IF_OPERATION_NOT_SUPPORTED(error, CMD_SUSFS_ADD_SUS_PATH);
 		return error;
-	
+	// add_sus_path_loop
+	} else if (argc == 3 && !strcmp(argv[1], "add_sus_path_loop")) {
+		struct st_susfs_sus_path info = {0};
+		struct stat sb;
+
+		if (get_file_stat(argv[2], &sb)) {
+			log("path '%s' not found, skip adding its ino\n", argv[2]);
+			return 1;
+		}
+		info.target_ino = sb.st_ino;
+		info.i_uid = sb.st_uid;
+		strncpy(info.target_pathname, argv[2], SUSFS_MAX_LEN_PATHNAME-1);
+		prctl(KERNEL_SU_OPTION, CMD_SUSFS_ADD_SUS_PATH_LOOP, &info, NULL, &error);
+		PRT_MSG_IF_OPERATION_NOT_SUPPORTED(error, CMD_SUSFS_ADD_SUS_PATH_LOOP);
+		return error;
 	// set_android_data_root_path
 	} else if (argc == 3 && !strcmp(argv[1], "set_android_data_root_path")) {
 		prctl(KERNEL_SU_OPTION, CMD_SUSFS_SET_ANDROID_DATA_ROOT_PATH, argv[2], NULL, &error);
@@ -772,5 +791,4 @@ int main(int argc, char *argv[]) {
 out:
 	return 0;
 }
-
 
