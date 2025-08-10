@@ -42,6 +42,7 @@
 #define CMD_SUSFS_SHOW_SUS_SU_WORKING_MODE 0x555e4
 #define CMD_SUSFS_IS_SUS_SU_READY 0x555f0
 #define CMD_SUSFS_SUS_SU 0x60000
+#define CMD_SUSFS_ENABLE_AVC_LOG_SPOOFING 0x60010
 
 #define SUSFS_MAX_LEN_PATHNAME 256
 #define SUSFS_MAX_LEN_MOUNT_TYPE_NAME 32
@@ -71,7 +72,7 @@
 /******************
  ** Define Macro **
  ******************/
-#define log(fmt, msg...) printf(TAG ":" fmt, ##msg);
+#define log(fmt, msg...) printf(fmt, ##msg);
 #define PRT_MSG_IF_OPERATION_NOT_SUPPORTED(x, cmd) if (x == -1) log("[-] CMD: '0x%x', SUSFS operation not supported, please enable it in kernel\n", cmd)
 
 /*******************
@@ -211,114 +212,119 @@ int enable_sus_su(int last_working_mode, int target_working_mode) {
 }
 
 static void print_help(void) {
-	log(" usage: %s <CMD> [CMD options]\n", TAG);
-	log("    <CMD>:\n");
-	log("        add_sus_path </path/of/file_or_directory>\n");
-	log("         |--> Added path and all its sub-paths will be hidden from several syscalls\n");
-	log("         |--> Please be reminded that the target path must be added after the bind mount or overlay operation if any, otherwise it won't be effective\n");
-	log("         |--> To fix the leak of app path after /sdcard/Android/data from syscall, please run ksu_susfs set_android_data_root_path </path/of/sdcard/Android/data> first\n");
-	log("         |--> To hide paths after /sdcard/, please run ksu_susfs set_sdcard_root_path </root/dir/of/sdcard> first\n");
+	log("usage: %s <CMD> [CMD options]\n", TAG);
+	log("  <CMD>:\n");
+	log("    add_sus_path </path/of/file_or_directory>\n");
+	log("      |--> Added path and all its sub-paths will be hidden from several syscalls\n");
+	log("      |--> Please be reminded that the target path must be added after the bind mount or overlay operation if any, otherwise it won't be effective\n");
+	log("      |--> To fix the leak of app path after /sdcard/Android/data from syscall, please run ksu_susfs set_android_data_root_path </path/of/sdcard/Android/data> first\n");
+	log("      |--> To hide paths after /sdcard/, please run ksu_susfs set_sdcard_root_path </root/dir/of/sdcard> first\n");
 	log("\n");
-	log("        add_sus_path_loop </path/not/inside/sdcard>\n");
-	log("         |--> The only different to add_sus_path is the added sus_path will be flagged as SUS_PATH again per each zygote spawned non-rooted process\n");
-	log("         |--> This applies to regular path (not including path in /sdcard/) only\n");
+	log("    add_sus_path_loop </path/not/inside/sdcard>\n");
+	log("      |--> The only different to add_sus_path is the added sus_path will be flagged as SUS_PATH again per each zygote spawned non-rooted process\n");
+	log("      |--> This applies to regular path (not including path in /sdcard/) only\n");
 	log("\n");
-	log("        set_android_data_root_path </root/dir/of/sdcard/Android/data>\n");
-	log("         |--> To fix the leak of app path after /sdcard/Android/data/ from syscall, first you need to tell the susfs kernel where is the actual path '/sdcard/Android/data' located, as it may vary on different phones\n");
-	log("         |--> Effective for no root access granted user apps only\n");
+	log("    set_android_data_root_path </root/dir/of/sdcard/Android/data>\n");
+	log("      |--> To fix the leak of app path after /sdcard/Android/data/ from syscall, first you need to tell the susfs kernel where is the actual path '/sdcard/Android/data' located, as it may vary on different phones\n");
+	log("      |--> Effective for no root access granted user apps only\n");
 	log("\n");
-	log("        set_sdcard_root_path </root/dir/of/sdcard>\n");
-	log("         |--> To hide paths after /sdcard/, first you need to tell the susfs kernel where is the actual path '/sdcard' located, as it may vary on different phones\n");
-	log("         |--> Warning: All no root access granted user apps cannot see any sus paths in /sdcard/ unless you grant root access for the target app\n");
+	log("    set_sdcard_root_path </root/dir/of/sdcard>\n");
+	log("      |--> To hide paths after /sdcard/, first you need to tell the susfs kernel where is the actual path '/sdcard' located, as it may vary on different phones\n");
+	log("      |--> Warning: All no root access granted user apps cannot see any sus paths in /sdcard/ unless you grant root access for the target app\n");
 	log("\n");
-	log("        add_sus_mount <mounted_path>\n");
-	log("         |--> Added mounted path will be hidden from /proc/self/[mounts|mountinfo|mountstats]\n");
-	log("         |--> Please be reminded that the target path must be added after the bind mount or overlay operation, otherwise it won't be effective\n");
+	log("    add_sus_mount <mounted_path>\n");
+	log("      |--> Added mounted path will be hidden from /proc/self/[mounts|mountinfo|mountstats]\n");
+	log("      |--> Please be reminded that the target path must be added after the bind mount or overlay operation, otherwise it won't be effective\n");
 	log("\n");
-	log("        hide_sus_mnts_for_all_procs <0|1>\n");
-	log("         |--> 0 -> Do not hide sus mounts for all processes but only non ksu process\n");
-	log("         |--> 1 -> Hide all sus mounts for all processes no matter they are ksu processes or not\n");
-	log("         |--> NOTE:\n");
-	log("              - It is set to 1 in kernel by default\n");
-	log("              - It is recommended to set to 0 after screen is unlocked, or during service.sh or boot-completed.sh stage, as this should fix the issue on some rooted apps that rely on mounts mounted by ksu process\n");
+	log("    hide_sus_mnts_for_all_procs <0|1>\n");
+	log("      |--> 0 -> Do not hide sus mounts for all processes but only non ksu process\n");
+	log("      |--> 1 -> Hide all sus mounts for all processes no matter they are ksu processes or not\n");
+	log("      |--> NOTE:\n");
+	log("           - It is set to 1 in kernel by default\n");
+	log("           - It is recommended to set to 0 after screen is unlocked, or during service.sh or boot-completed.sh stage, as this should fix the issue on some rooted apps that rely on mounts mounted by ksu process\n");
 	log("\n");
-	log("        umount_for_zygote_iso_service <0|1>\n");
-	log("         |--> 0 -> Do not umount for zygote spawned isolated service process\n");
-	log("         |--> 1 -> Enable to umount for zygote spawned isolated service process\n");
-	log("         |--> NOTE:\n");
-	log("              - By default it is set to 0 in kernel, or create '/data/adb/susfs_umount_for_zygote_iso_service' to set it to 1 on boot\n");
-	log("              - Set to 0 if you have modules that overlay framework system files like framework.jar or other overlay apk, then atm you should let other module like zygisk and its hiding module to take care of, otherwise it may cause bootloop\n");
-	log("              - Set to 1 if you DO NOT have such modules mentioned above, otherwise sus mounts won't be umounted for zygote spawned isolated process and they will be detected\n");
+	log("    umount_for_zygote_iso_service <0|1>\n");
+	log("      |--> 0 -> Do not umount for zygote spawned isolated service process\n");
+	log("      |--> 1 -> Enable to umount for zygote spawned isolated service process\n");
+	log("      |--> NOTE:\n");
+	log("           - By default it is set to 0 in kernel, or create '/data/adb/susfs_umount_for_zygote_iso_service' to set it to 1 on boot\n");
+	log("           - Set to 0 if you have modules that overlay framework system files like framework.jar or other overlay apk, then atm you should let other module like zygisk and its hiding module to take care of, otherwise it may cause bootloop\n");
+	log("           - Set to 1 if you DO NOT have such modules mentioned above, otherwise sus mounts won't be umounted for zygote spawned isolated process and they will be detected\n");
 	log("\n");
-	log("        add_sus_kstat_statically </path/of/file_or_directory> <ino> <dev> <nlink> <size>\\\n");
-	log("                                 <atime> <atime_nsec> <mtime> <mtime_nsec> <ctime> <ctime_nsec>\n");
-	log("                                 <blocks> <blksize>\n");
-	log("         |--> Use 'stat' tool to find the format:\n");
-	log("                  ino -> %%i, dev -> %%d, nlink -> %%h, atime -> %%X, mtime -> %%Y, ctime -> %%Z\n");
-	log("                  size -> %%s, blocks -> %%b, blksize -> %%B\n");
-	log("         |--> e.g., %s add_sus_kstat_statically '/system/addon.d' '1234' '1234' '2' '223344'\\\n", TAG);
-	log("                       '1712592355' '0' '1712592355' '0' '1712592355' '0' '1712592355' '0'\\\n");
-	log("                       '16' '512'\n");
-	log("         |--> Or pass 'default' to use its original value:\n");
-	log("         |--> e.g., %s add_sus_kstat_statically '/system/addon.d' 'default' 'default' 'default' 'default'\\\n", TAG);
-	log("                       '1712592355' 'default' '1712592355' 'default' '1712592355' 'default'\\\n");
-	log("                       'default' 'default'\n");
+	log("    add_sus_kstat_statically </path/of/file_or_directory> <ino> <dev> <nlink> <size> <atime> <atime_nsec> <mtime> <mtime_nsec> <ctime> <ctime_nsec> <blocks> <blksize>\n");
+	log("      |--> Use 'stat' tool to find the format:\n");
+	log("               ino -> %%i, dev -> %%d, nlink -> %%h, atime -> %%X, mtime -> %%Y, ctime -> %%Z\n");
+	log("               size -> %%s, blocks -> %%b, blksize -> %%B\n");
+	log("      |--> e.g., %s add_sus_kstat_statically '/system/addon.d' '1234' '1234' '2' '223344'\\\n", TAG);
+	log("                    '1712592355' '0' '1712592355' '0' '1712592355' '0' '1712592355' '0'\\\n");
+	log("                    '16' '512'\n");
+	log("      |--> Or pass 'default' to use its original value:\n");
+	log("      |--> e.g., %s add_sus_kstat_statically '/system/addon.d' 'default' 'default' 'default' 'default'\\\n", TAG);
+	log("                    '1712592355' 'default' '1712592355' 'default' '1712592355' 'default'\\\n");
+	log("                    'default' 'default'\n");
 	log("\n");
-	log("        add_sus_kstat </path/of/file_or_directory>\n");
-	log("         |--> Add the desired path BEFORE it gets bind mounted or overlayed, this is used for storing original stat info in kernel memory\n");
-	log("         |--> This command must be completed with <update_sus_kstat> later after the added path is bind mounted or overlayed\n");
+	log("    add_sus_kstat </path/of/file_or_directory>\n");
+	log("      |--> Add the desired path BEFORE it gets bind mounted or overlayed, this is used for storing original stat info in kernel memory\n");
+	log("      |--> This command must be completed with <update_sus_kstat> later after the added path is bind mounted or overlayed\n");
 	log("\n");
-	log("        update_sus_kstat </path/of/file_or_directory>\n");
-	log("         |--> Add the desired path you have added before via <add_sus_kstat> to complete the kstat spoofing procedure\n");
-	log("         |--> This updates the target ino, but size and blocks are remained the same as current stat\n");
+	log("    update_sus_kstat </path/of/file_or_directory>\n");
+	log("      |--> Add the desired path you have added before via <add_sus_kstat> to complete the kstat spoofing procedure\n");
+	log("      |--> This updates the target ino, but size and blocks are remained the same as current stat\n");
 	log("\n");
-	log("        update_sus_kstat_full_clone </path/of/file_or_directory>\n");
-	log("         |--> Add the desired path you have added before via <add_sus_kstat> to complete the kstat spoofing procedure\n");
-	log("         |--> This updates the target ino only, other stat members are remained the same as the original stat\n");
+	log("    update_sus_kstat_full_clone </path/of/file_or_directory>\n");
+	log("      |--> Add the desired path you have added before via <add_sus_kstat> to complete the kstat spoofing procedure\n");
+	log("      |--> This updates the target ino only, other stat members are remained the same as the original stat\n");
 	log("\n");
-	log("        add_try_umount </path/of/file_or_directory> <mode>\n");
-	log("         |--> Added path will be umounted from KSU for all UIDs that are NOT su allowed, and profile template configured with umount\n");
-	log("         |--> <mode>: 0 -> umount with no flags, 1 -> umount with MNT_DETACH\n");
-	log("         |--> NOTE: susfs umount takes precedence of ksu umount\n");
+	log("    add_try_umount </path/of/file_or_directory> <mode>\n");
+	log("      |--> Added path will be umounted from KSU for all UIDs that are NOT su allowed, and profile template configured with umount\n");
+	log("      |--> <mode>: 0 -> umount with no flags, 1 -> umount with MNT_DETACH\n");
+	log("      |--> NOTE: susfs umount takes precedence of ksu umount\n");
 	log("\n");
-	log("        run_try_umount\n");
-	log("         |--> Make all sus mounts to be private and umount them one by one in kernel for the mount namespace of current process\n");
+	log("    run_try_umount\n");
+	log("      |--> Make all sus mounts to be private and umount them one by one in kernel for the mount namespace of current process\n");
 	log("\n");
-	log("        set_uname <release> <version>\n");
-	log("         |--> NOTE: Only 'release' and <version> are spoofed as others are no longer needed\n");
-	log("         |--> Spoof uname for all processes, set string to 'default' to imply the function to use original string\n");
-	log("         |--> e.g., set_uname '4.9.337-g3291538446b7' 'default'\n");
+	log("    set_uname <release> <version>\n");
+	log("      |--> NOTE: Only 'release' and <version> are spoofed as others are no longer needed\n");
+	log("      |--> Spoof uname for all processes, set string to 'default' to imply the function to use original string\n");
+	log("      |--> e.g., set_uname '4.9.337-g3291538446b7' 'default'\n");
 	log("\n");
-	log("        enable_log <0|1>\n");
-	log("         |--> 0: disable susfs log in kernel, 1: enable susfs log in kernel\n");
+	log("    enable_log <0|1>\n");
+	log("      |--> 0: disable susfs log in kernel, 1: enable susfs log in kernel\n");
 	log("\n");
-	log("        set_cmdline_or_bootconfig </path/to/fake_cmdline_file/or/fake_bootconfig_file>\n");
-	log("         |--> Spoof the output of /proc/cmdline (non-gki) or /proc/bootconfig (gki) from a text file\n");
+	log("    set_cmdline_or_bootconfig </path/to/fake_cmdline_file/or/fake_bootconfig_file>\n");
+	log("      |--> Spoof the output of /proc/cmdline (non-gki) or /proc/bootconfig (gki) from a text file\n");
 	log("\n");
-	log("        add_open_redirect </target/path> </redirected/path>\n");
-	log("         |--> Redirect the target path to be opened with user defined path\n");
+	log("    add_open_redirect </target/path> </redirected/path>\n");
+	log("      |--> Redirect the target path to be opened with user defined path\n");
 	log("\n");
-	log("        show <version|enabled_features|variant>\n");
-	log("         |--> version: show the current susfs version implemented in kernel\n");
-	log("         |--> enabled_features: show the current implemented susfs features in kernel\n");
-	log("         |--> variant: show the current variant: GKI or NON-GKI\n");
+	log("    show <version|enabled_features|variant>\n");
+	log("      |--> version: show the current susfs version implemented in kernel\n");
+	log("      |--> enabled_features: show the current implemented susfs features in kernel\n");
+	log("      |--> variant: show the current variant: GKI or NON-GKI\n");
 	log("\n");
-	log("        sus_su <0|1|2|show_working_mode>\n");
-	log("         |--> NOTE-1:\n");
-	log("              - For mode 1: (deprecated) It disables kprobe hooks made by ksu, and instead,\n");
-	log("                a sus_su character device driver with random name will be created, and user\n");
-	log("                need to use a tool named 'sus_su' together with a path file in same current directory\n");
-	log("                named '" SUS_SU_CONF_FILE_PATH "' to get a root shell from the sus_su driver.'\n");
-	log("                ** sus_su userspace tool and an overlay mount is required **'\n");
-	log("              - For mode 2: It disables kprobe hooks made by ksu, and instead,\n");
-	log("                the non-kprobe inline hooks will be enbaled, just the same implementation for non-gki kernel without kprobe supported)\n");
-	log("                ** Needs no extra userspace tools and mounts **\n");
-	log("         |--> NOTE-2:\n");
-	log("                Please see the service.sh template from ksu_module_susfs for the usage\n");
-	log("         |--> 0: enable core ksu kprobe hooks and disable sus_su driver\n");
-	log("         |--> 1: (deprecated), disable the core ksu kprobe hooks and enable sus_su fifo driver\n");
-	log("         |--> 2: disable the core ksu kprobe hooks and enable sus_su just with non-kprobe hooks\n");
-	log("         |--> show_working_mode: show the current sus_su working mode, [0,1,2]\n");
+	log("    sus_su <0|1|2|show_working_mode>\n");
+	log("      |--> NOTE-1:\n");
+	log("           - For mode 1: (deprecated) It disables kprobe hooks made by ksu, and instead,\n");
+	log("             a sus_su character device driver with random name will be created, and user\n");
+	log("             need to use a tool named 'sus_su' together with a path file in same current directory\n");
+	log("             named '" SUS_SU_CONF_FILE_PATH "' to get a root shell from the sus_su driver.'\n");
+	log("             ** sus_su userspace tool and an overlay mount is required **'\n");
+	log("           - For mode 2: It disables kprobe hooks made by ksu, and instead,\n");
+	log("             the non-kprobe inline hooks will be enbaled, just the same implementation for non-gki kernel without kprobe supported)\n");
+	log("             ** Needs no extra userspace tools and mounts **\n");
+	log("      |--> NOTE-2:\n");
+	log("             Please see the service.sh template from ksu_module_susfs for the usage\n");
+	log("      |--> 0: enable core ksu kprobe hooks and disable sus_su driver\n");
+	log("      |--> 1: (deprecated), disable the core ksu kprobe hooks and enable sus_su fifo driver\n");
+	log("      |--> 2: disable the core ksu kprobe hooks and enable sus_su just with non-kprobe hooks\n");
+	log("      |--> show_working_mode: show the current sus_su working mode, [0,1,2]\n");
+	log("\n");
+	log("    enable_avc_log_spoofing <0|1>\n");
+	log("      |--> 0: Disable spoofing the sus 'su' tcontext shown in avc log in kernel\n");
+	log("      |--> 1: Enable spoofing the sus tcontext 'su' with 'kernel' shown in avc log in kernel\n");
+	log("      * Important Note *\n");
+	log("      - It is set to '0' by default in kernel\n");
+	log("      - Enable this will sometimes make developers hard to identify the cause when they are debugging with some permission or selinux issue, so users are advised to disbale this when doing so.\n");
 	log("\n");
 }
 
@@ -784,6 +790,15 @@ int main(int argc, char *argv[]) {
 			print_help();
 			return 1;
 		}
+		return error;
+	// enable_avc_log_spoofing
+	} else if (argc == 3 && !strcmp(argv[1], "enable_avc_log_spoofing")) {
+		if (strcmp(argv[2], "0") && strcmp(argv[2], "1")) {
+			print_help();
+			return 1;
+		}
+		prctl(KERNEL_SU_OPTION, CMD_SUSFS_ENABLE_AVC_LOG_SPOOFING, atoi(argv[2]), NULL, &error);
+		PRT_MSG_IF_OPERATION_NOT_SUPPORTED(error, CMD_SUSFS_ENABLE_AVC_LOG_SPOOFING);
 		return error;
 	} else {
 		print_help();
