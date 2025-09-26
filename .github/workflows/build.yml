@@ -36,7 +36,10 @@ jobs:
           echo "for now only aarch64 is built"
           chmod +x sstrip
 
-          for i in {152..159}; do
+          # Dynamically get all version directories (numeric directories only)
+          VERSION_DIRS=$(find . -maxdepth 1 -type d -name '[0-9]*' | sed 's|./||' | sort -n)
+          
+          for i in $VERSION_DIRS; do
             if [ $i -eq 156 ]; then
               mkdir -p binaries/$i/gki/
             else
@@ -45,7 +48,7 @@ jobs:
             fi
           done
           
-          for i in {152..159}; do
+          for i in $VERSION_DIRS; do
             if [ $i -eq 156 ]; then
               # Compile GKI version
               ./zig/zig cc -target aarch64-linux -s -Oz $i/gki/main.c -static -s -Wl,--gc-sections -o binaries/$i/gki/ksu_susfs_arm64 -I ./android-ndk-r23b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include
