@@ -26,6 +26,7 @@
 #define CMD_SUSFS_SET_SDCARD_ROOT_PATH 0x55552
 #define CMD_SUSFS_ADD_SUS_MOUNT 0x55560
 #define CMD_SUSFS_HIDE_SUS_MNTS_FOR_ALL_PROCS 0x55561
+#define CMD_SUSFS_UMOUNT_FOR_ZYGOTE_ISO_SERVICE 0x55562
 #define CMD_SUSFS_ADD_SUS_KSTAT 0x55570
 #define CMD_SUSFS_UPDATE_SUS_KSTAT 0x55571
 #define CMD_SUSFS_ADD_SUS_KSTAT_STATICALLY 0x55572
@@ -34,6 +35,7 @@
 #define CMD_SUSFS_ENABLE_LOG 0x555a0
 #define CMD_SUSFS_SET_CMDLINE_OR_BOOTCONFIG 0x555b0
 #define CMD_SUSFS_ADD_OPEN_REDIRECT 0x555c0
+#define CMD_SUSFS_RUN_UMOUNT_FOR_CURRENT_MNT_NS 0x555d0
 #define CMD_SUSFS_SHOW_VERSION 0x555e1
 #define CMD_SUSFS_SHOW_ENABLED_FEATURES 0x555e2
 #define CMD_SUSFS_SHOW_VARIANT 0x555e3
@@ -241,6 +243,11 @@ static void print_help(void) {
 	log("           - It is set to 1 in kernel by default\n");
 	log("           - It is recommended to set to 0 after screen is unlocked, or during service.sh or boot-completed.sh stage, as this should fix the issue on some rooted apps that rely on mounts mounted by ksu process\n");
 	log("\n");
+	log("    umount_for_zygote_iso_service <0|1>\n");
+	log("      |--> 0 -> Do not umount for zygote spawned isolated service process\n");
+	log("      |--> 1 -> Enable to umount for zygote spawned isolated service process\n");
+	log("      |--> NOTE:\n");
+	log("           - By default it is set to 0 in kernel, or create '/data/adb/susfs_umount_for_zygote_iso_service' to set it to 1 on boot\n");
 	log("           - Set to 0 if you have modules that overlay framework system files like framework.jar or other overlay apk, then atm you should let other module like zygisk and its hiding module to take care of, otherwise it may cause bootloop\n");
 	log("           - Set to 1 if you DO NOT have such modules mentioned above, otherwise sus mounts won't be umounted for zygote spawned isolated process and they will be detected\n");
 	log("\n");
@@ -272,6 +279,9 @@ static void print_help(void) {
 	log("      |--> Added path will be umounted from KSU for all UIDs that are NOT su allowed, and profile template configured with umount\n");
 	log("      |--> <mode>: 0 -> umount with no flags, 1 -> umount with MNT_DETACH\n");
 	log("      |--> NOTE: susfs umount takes precedence of ksu umount\n");
+	log("\n");
+	log("    run_try_umount\n");
+	log("      |--> Make all sus mounts to be private and umount them one by one in kernel for the mount namespace of current process\n");
 	log("\n");
 	log("    set_uname <release> <version>\n");
 	log("      |--> NOTE: Only 'release' and <version> are spoofed as others are no longer needed\n");
@@ -387,6 +397,15 @@ int main(int argc, char *argv[]) {
 		}
 		prctl(KERNEL_SU_OPTION, CMD_SUSFS_HIDE_SUS_MNTS_FOR_ALL_PROCS, atoi(argv[2]), NULL, &error);
 		PRT_MSG_IF_OPERATION_NOT_SUPPORTED(error, CMD_SUSFS_HIDE_SUS_MNTS_FOR_ALL_PROCS);
+		return error;
+	// umount_for_zygote_iso_service
+	} else if (argc == 3 && !strcmp(argv[1], "umount_for_zygote_iso_service")) {
+		if (strcmp(argv[2], "0") && strcmp(argv[2], "1")) {
+			print_help();
+			return 1;
+		}
+		prctl(KERNEL_SU_OPTION, CMD_SUSFS_UMOUNT_FOR_ZYGOTE_ISO_SERVICE, atoi(argv[2]), NULL, &error);
+		PRT_MSG_IF_OPERATION_NOT_SUPPORTED(error, CMD_SUSFS_UMOUNT_FOR_ZYGOTE_ISO_SERVICE);
 		return error;
 	// add_sus_kstat_statically
 	} else if (argc == 15 && !strcmp(argv[1], "add_sus_kstat_statically")) {
@@ -598,6 +617,11 @@ int main(int argc, char *argv[]) {
 		}
 		prctl(KERNEL_SU_OPTION, CMD_SUSFS_ADD_TRY_UMOUNT, &info, NULL, &error);
 		PRT_MSG_IF_OPERATION_NOT_SUPPORTED(error, CMD_SUSFS_ADD_TRY_UMOUNT);
+		return error;
+	// run_try_umount
+	} else if (argc == 2 && !strcmp(argv[1], "run_try_umount")) {
+		prctl(KERNEL_SU_OPTION, CMD_SUSFS_RUN_UMOUNT_FOR_CURRENT_MNT_NS, NULL, NULL, &error);
+		PRT_MSG_IF_OPERATION_NOT_SUPPORTED(error, CMD_SUSFS_RUN_UMOUNT_FOR_CURRENT_MNT_NS);
 		return error;
 	// set_uname
 	} else if (argc == 4 && !strcmp(argv[1], "set_uname")) {
