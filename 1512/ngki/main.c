@@ -42,6 +42,7 @@
 #define CMD_SUSFS_IS_SUS_SU_READY 0x555f0
 #define CMD_SUSFS_SUS_SU 0x60000
 #define CMD_SUSFS_ENABLE_AVC_LOG_SPOOFING 0x60010
+#define CMD_SUSFS_ADD_SUS_MAP 0x60020
 
 #define SUSFS_MAX_LEN_PATHNAME 256
 #define SUSFS_MAX_LEN_MOUNT_TYPE_NAME 32
@@ -124,6 +125,10 @@ struct st_susfs_open_redirect {
 
 struct st_sus_su {
 	int                     mode;
+};
+
+struct st_susfs_sus_map {
+	char                    target_pathname[SUSFS_MAX_LEN_PATHNAME];
 };
 
 /**********************
@@ -314,6 +319,14 @@ static void print_help(void) {
 	log("      |--> 1: (deprecated), disable the core ksu kprobe hooks and enable sus_su fifo driver\n");
 	log("      |--> 2: disable the core ksu kprobe hooks and enable sus_su just with non-kprobe hooks\n");
 	log("      |--> show_working_mode: show the current sus_su working mode, [0,1,2]\n");
+	log("\n");
+	log("    add_sus_map </path/to/actual/library>\n");
+	log("      |--> Added real file path which gets mmapped will be hidden from /proc/self/[maps|smaps|smaps_rollup|map_files|mem|pagemap]\n");
+	log("      |--> e.g., add_sus_map '/data/adb/modules/my_module/zygisk/arm64-v8a.so'\n");
+	log("      * Important Note *\n");
+	log("      - It does NOT support hiding for anon memory.\n");
+	log("      - It does NOT hide any inline hooks or plt hooks cause by the injected library itself\n");
+	log("      - It may not be able to evade detections by apps that implement a good injection detection\n");
 	log("\n");
 	log("    enable_avc_log_spoofing <0|1>\n");
 	log("      |--> 0: Disable spoofing the sus 'su' tcontext shown in avc log in kernel\n");
@@ -781,6 +794,14 @@ int main(int argc, char *argv[]) {
 			print_help();
 			return 1;
 		}
+		return error;
+	// add_sus_map
+	} else if (argc == 3 && !strcmp(argv[1], "add_sus_map")) {
+		struct st_susfs_sus_map info = {0};
+
+		strncpy(info.target_pathname, argv[2], SUSFS_MAX_LEN_PATHNAME-1);
+		prctl(KERNEL_SU_OPTION, CMD_SUSFS_ADD_SUS_MAP, &info, NULL, &error);
+		PRT_MSG_IF_OPERATION_NOT_SUPPORTED(error, CMD_SUSFS_ADD_SUS_MAP);
 		return error;
 	// enable_avc_log_spoofing
 	} else if (argc == 3 && !strcmp(argv[1], "enable_avc_log_spoofing")) {
