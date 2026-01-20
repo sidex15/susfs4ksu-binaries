@@ -213,7 +213,7 @@ int isNumeric(char* str) {
 
 int get_file_stat(char *pathname, struct stat* sb) {
 	if (stat(pathname, sb) != 0) {
-		return errno;
+		return 1;
 	}
 	return 0;
 }
@@ -635,7 +635,7 @@ int main(int argc, char *argv[]) {
 		p_abs_path = realpath(info.target_pathname, abs_path);
 		if (p_abs_path == NULL) {
 			perror("realpath");
-			return errno;
+			return 1;
 		}
 		if (!strcmp(p_abs_path, "/odm") ||
 			!strcmp(p_abs_path, "/system") ||
@@ -700,13 +700,13 @@ int main(int argc, char *argv[]) {
 		if (p_abs_path == NULL) {
 			perror("realpath");
 			free(info);
-			return errno;
+			return 1;
 		}
 		file = fopen(abs_path, "rb");
 		if (file == NULL) {
 			perror("Error opening file");
 			free(info);
-			return errno;
+			return 1;
 		}
 		fseek(file, 0, SEEK_END);
 		file_size = ftell(file);
@@ -741,13 +741,13 @@ int main(int argc, char *argv[]) {
 		p_abs_target_pathname = realpath(argv[2], target_pathname);
 		if (p_abs_target_pathname == NULL) {
 			perror("realpath");
-			return errno;
+			return 1;
 		}
 		strncpy(info.target_pathname, target_pathname, SUSFS_MAX_LEN_PATHNAME-1);
 		p_abs_redirected_pathname = realpath(argv[3], redirected_pathname);
 		if (p_abs_redirected_pathname == NULL) {
 			perror("realpath");
-			return errno;
+			return 1;
 		}
 		strncpy(info.redirected_pathname, redirected_pathname, SUSFS_MAX_LEN_PATHNAME-1);
 		info.err = get_file_stat(info.target_pathname, &sb);
