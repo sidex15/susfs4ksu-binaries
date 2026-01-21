@@ -825,6 +825,7 @@ int main(int argc, char *argv[]) {
 		}
 	} else {
 		print_help();
+		return 254;
 	}
 out:
 	return 0;
