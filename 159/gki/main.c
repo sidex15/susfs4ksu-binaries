@@ -800,7 +800,14 @@ int main(int argc, char *argv[]) {
 		prctl(KERNEL_SU_OPTION, CMD_SUSFS_ENABLE_AVC_LOG_SPOOFING, atoi(argv[2]), NULL, &error);
 		PRT_MSG_IF_OPERATION_NOT_SUPPORTED(error, CMD_SUSFS_ENABLE_AVC_LOG_SPOOFING);
 		return error;
-	} else {
+	} 
+	// unknown command
+	else if (argc >=2 ) {
+		print_help();
+		return 254;
+	}
+	// if there's no argument provided, print help message
+	else {
 		print_help();
 	}
 out:

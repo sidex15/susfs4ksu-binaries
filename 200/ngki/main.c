@@ -823,9 +823,15 @@ int main(int argc, char *argv[]) {
 		} else {
 			print_help();
 		}
-	} else {
+	} 
+	// unknown command
+	else if (argc >=2 ) {
 		print_help();
 		return 254;
+	}
+	// if there's no argument provided, print help message
+	else {
+		print_help();
 	}
 out:
 	return 0;
