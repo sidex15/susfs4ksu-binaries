@@ -1,6 +1,7 @@
 name: build susfs_userspace
 
 on:
+  push:
   workflow_dispatch:
 
 jobs:
@@ -10,7 +11,7 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
         with:
-          ref: source-code
+          ref: universal-binary
 
       - name: grab ndk
         run: |
@@ -35,37 +36,17 @@ jobs:
           ls -la ; pwd
           echo "for now only aarch64 is built"
           chmod +x sstrip
-
-          # Dynamically get all version directories (numeric directories only)
-          VERSION_DIRS=$(find . -maxdepth 1 -type d -name '[0-9]*' | sed 's|./||' | sort -n)
           
-          for i in $VERSION_DIRS; do
-            if [ $i -eq 156 ]; then
-              mkdir -p binaries/$i/gki/
-            else
-              mkdir -p binaries/$i/gki/
-              mkdir -p binaries/$i/non-gki/
-            fi
-          done
-          
-          for i in $VERSION_DIRS; do
-             if [ $i -eq 156 ]; then
-              # Compile GKI version
-              ./zig/zig cc -target aarch64-linux -s -Oz $i/gki/main.c -static -s -Wl,--gc-sections -o binaries/$i/gki/ksu_susfs_arm64 -I ./android-ndk-r27d/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include
-            else
-              # Compile GKI version
-              ./zig/zig cc -target aarch64-linux -s -Oz $i/gki/main.c -static -s -Wl,--gc-sections -o binaries/$i/gki/ksu_susfs_arm64 -I ./android-ndk-r27d/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include
-              # Compile non-GKI version
-              ./zig/zig cc -target aarch64-linux -s -Oz $i/ngki/main.c -static -s -Wl,--gc-sections -o binaries/$i/non-gki/ksu_susfs_arm64 -I ./android-ndk-r27d/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include
-            fi
-          done
+          ./zig/zig cc -target aarch64-linux -s -Oz main.c -static -s -Wl,--gc-sections -o ksu_susfs_arm64 -I ./android-ndk-r27d/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include
 
-          upx --ultra-brute binaries/*/*/ksu_susfs_arm64
-          for i in binaries/*/*/ksu_susfs_arm64; do ./sstrip $i ; done;
+          upx --ultra-brute ksu_susfs_arm64
+          ./sstrip ksu_susfs_arm64;
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: susfs_binaries
-          path: binaries/
+      - name: Commit & Push changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add ksu_susfs_arm64
+          git commit -m "Update susfs_userspace binaries"
+          git push origin universal-binary
 
