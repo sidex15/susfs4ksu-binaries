@@ -100,6 +100,12 @@ static int g_abi     = ABI_UNKNOWN;
 static int g_version = 0;   /* e.g. 152, 153, 154, 158, 159, 1510, 1511, 1512, 2000 */
 static char *g_version_string = NULL; /* e.g. "v1.5.2", "v1.5.4", "v2.0.0" */
 
+/* Runtime-detected v2.0.0 SUS_PATH ABI layout. */
+#define V2000_SUS_PATH_LAYOUT_UNKNOWN 0
+#define V2000_SUS_PATH_LAYOUT_OLD     1
+#define V2000_SUS_PATH_LAYOUT_NEW     2
+static int g_v2000_sus_path_layout = V2000_SUS_PATH_LAYOUT_UNKNOWN;
+
 /* True when the running kernel supports the given minimum version integer. */
 #define HAVE(v)  (g_version >= (v))
 
@@ -180,6 +186,12 @@ struct sus_path_v2000 {
     unsigned long   target_ino;
     char            target_pathname[SUSFS_MAX_LEN_PATHNAME];
     unsigned int    i_uid;
+    int             err;
+};
+
+/* Newer v2.0.0+ kernels removed target_ino/i_uid from st_susfs_sus_path. */
+struct sus_path_v2000_new {
+    char            target_pathname[SUSFS_MAX_LEN_PATHNAME];
     int             err;
 };
 
@@ -417,6 +429,25 @@ static void copy_stat_to_kstat_v2000(struct sus_kstat_v2000 *k, const struct sta
     k->spoofed_ctime_tv_nsec = sb->st_ctimensec;
     k->spoofed_blksize       = sb->st_blksize;
     k->spoofed_blocks        = sb->st_blocks;
+}
+
+/* Dispatch CMD_SUSFS_ADD_SUS_PATH[_LOOP] with either old or new v2.0.0 layout. */
+static int v2000_cmd_sus_path(unsigned long cmd, const char *path, const struct stat *sb, int layout) {
+    if (layout == V2000_SUS_PATH_LAYOUT_NEW) {
+        struct sus_path_v2000_new info = {0};
+        strncpy(info.target_pathname, path, SUSFS_MAX_LEN_PATHNAME - 1);
+        info.err = ERR_v2000_CMD_NOT_SUPPORTED;
+        v2000_cmd(cmd, &info);
+        return info.err;
+    }
+
+    struct sus_path_v2000 info = {0};
+    strncpy(info.target_pathname, path, SUSFS_MAX_LEN_PATHNAME - 1);
+    info.target_ino = sb->st_ino;
+    info.i_uid      = sb->st_uid;
+    info.err        = ERR_v2000_CMD_NOT_SUPPORTED;
+    v2000_cmd(cmd, &info);
+    return info.err;
 }
 
 /* Read a file into a malloc'd buffer (null-terminated). Caller must free(). */
@@ -717,14 +748,28 @@ static int cmd_add_sus_path(const char *path, bool loop) {
     int ret;
 
     if (g_abi == ABI_v2000) {
-        struct sus_path_v2000 info = {0};
-        strncpy(info.target_pathname, path, SUSFS_MAX_LEN_PATHNAME - 1);
-        info.target_ino = sb.st_ino;
-        info.i_uid      = sb.st_uid;
-        info.err        = ERR_v2000_CMD_NOT_SUPPORTED;
-        v2000_cmd(cmd, &info);
-        prt_not_supported(cmd, info.err);
-        ret = info.err;
+        int first = (g_v2000_sus_path_layout == V2000_SUS_PATH_LAYOUT_OLD)
+                    ? V2000_SUS_PATH_LAYOUT_OLD
+                    : V2000_SUS_PATH_LAYOUT_NEW;
+        int second = (first == V2000_SUS_PATH_LAYOUT_NEW)
+                     ? V2000_SUS_PATH_LAYOUT_OLD
+                     : V2000_SUS_PATH_LAYOUT_NEW;
+
+        ret = v2000_cmd_sus_path(cmd, path, &sb, first);
+
+        /* Existing user path + kernel ENOENT usually means SUS_PATH struct mismatch. */
+        if (ret == -ENOENT) {
+            int retry = v2000_cmd_sus_path(cmd, path, &sb, second);
+            if (retry != -ENOENT) {
+                ret = retry;
+                g_v2000_sus_path_layout = second;
+            }
+        }
+
+        if (!ret && g_v2000_sus_path_layout == V2000_SUS_PATH_LAYOUT_UNKNOWN)
+            g_v2000_sus_path_layout = first;
+
+        prt_not_supported(cmd, ret);
     } else if (HAVE(154)) {
         struct sus_path_v154 info = {0};
         strncpy(info.target_pathname, path, SUSFS_MAX_LEN_PATHNAME - 1);
