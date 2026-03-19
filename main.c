@@ -75,6 +75,10 @@
 /* v2.0.0 error sentinel */
 #define ERR_v2000_CMD_NOT_SUPPORTED  255
 
+/* Persistent cache marker for v2.0.0 old sus_path layout */
+#define SUS_PATH_LAYOUT_CACHE_DIR     "/data/adb/ksu/susfs4ksu"
+#define SUS_PATH_LAYOUT_OLD_MARKER    "/data/adb/ksu/susfs4ksu/using_old_sus_path_layout"
+
 /* Misc kernel constants */
 #define SUSFS_MAX_LEN_PATHNAME   256
 #ifndef __NEW_UTS_LEN
@@ -182,6 +186,7 @@ struct sus_map_v1 {             /* v1.5.12 */
 
 /* ------ v2.0.0 structs (all gain int err field) ------ */
 
+/* Old v2.0.0 kernel: has target_ino and i_uid */
 struct sus_path_v2000 {
     unsigned long   target_ino;
     char            target_pathname[SUSFS_MAX_LEN_PATHNAME];
@@ -189,11 +194,34 @@ struct sus_path_v2000 {
     int             err;
 };
 
-/* Newer v2.0.0+ kernels removed target_ino/i_uid from st_susfs_sus_path. */
+/* New v2.0.0 kernel: target_ino and i_uid removed, kernel resolves them itself */
 struct sus_path_v2000_new {
     char            target_pathname[SUSFS_MAX_LEN_PATHNAME];
     int             err;
 };
+
+static void load_sus_path_layout_cache(void) {
+    if (g_abi != ABI_v2000)
+        return;
+    if (access(SUS_PATH_LAYOUT_OLD_MARKER, F_OK) == 0)
+        g_v2000_sus_path_layout = V2000_SUS_PATH_LAYOUT_OLD;
+}
+
+static void persist_old_sus_path_layout_cache(void) {
+    int fd;
+    /* Best-effort cache directory creation. */
+    (void)mkdir(SUS_PATH_LAYOUT_CACHE_DIR, 0755);
+    fd = open(SUS_PATH_LAYOUT_OLD_MARKER, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (fd < 0) {
+        perror("open(layout_cache)");
+        return;
+    }
+    close(fd);
+}
+
+static void clear_old_sus_path_layout_cache(void) {
+    (void)unlink(SUS_PATH_LAYOUT_OLD_MARKER);
+}
 
 struct external_dir_v2000 {      /* set_android_data_root_path / set_sdcard_root_path */
     char            target_pathname[SUSFS_MAX_LEN_PATHNAME];
@@ -739,50 +767,64 @@ static int print_more_help(const char *cmd) {
 /* add_sus_path / add_sus_path_loop                                   */
 /* ------------------------------------------------------------------ */
 static int cmd_add_sus_path(const char *path, bool loop) {
-    struct stat sb;
-    if (get_file_stat(path, &sb)) {
-        printf("[-] Failed to stat '%s'\n", path);
-        return 1;
-    }
     unsigned long cmd = loop ? CMD_SUSFS_ADD_SUS_PATH_LOOP : CMD_SUSFS_ADD_SUS_PATH;
     int ret;
 
     if (g_abi == ABI_v2000) {
-        int first = (g_v2000_sus_path_layout == V2000_SUS_PATH_LAYOUT_OLD)
-                    ? V2000_SUS_PATH_LAYOUT_OLD
-                    : V2000_SUS_PATH_LAYOUT_NEW;
-        int second = (first == V2000_SUS_PATH_LAYOUT_NEW)
-                     ? V2000_SUS_PATH_LAYOUT_OLD
-                     : V2000_SUS_PATH_LAYOUT_NEW;
-
-        ret = v2000_cmd_sus_path(cmd, path, &sb, first);
-
-        /* Existing user path + kernel ENOENT usually means SUS_PATH struct mismatch. */
-        if (ret == -ENOENT) {
-            int retry = v2000_cmd_sus_path(cmd, path, &sb, second);
-            if (retry != -ENOENT) {
-                ret = retry;
-                g_v2000_sus_path_layout = second;
+        /* Try new struct layout first (or use cached result) */
+        if (g_v2000_sus_path_layout != V2000_SUS_PATH_LAYOUT_OLD) {
+            struct sus_path_v2000_new info = {0};
+            strncpy(info.target_pathname, path, SUSFS_MAX_LEN_PATHNAME - 1);
+            info.err = ERR_v2000_CMD_NOT_SUPPORTED;
+            v2000_cmd(cmd, &info);
+            if (info.err == 0 || g_v2000_sus_path_layout == V2000_SUS_PATH_LAYOUT_NEW) {
+                g_v2000_sus_path_layout = V2000_SUS_PATH_LAYOUT_NEW;
+                clear_old_sus_path_layout_cache();
+                prt_not_supported(cmd, info.err);
+                return info.err;
             }
+            /* New layout failed and not yet cached — fall through to old layout */
         }
-
-        if (!ret && g_v2000_sus_path_layout == V2000_SUS_PATH_LAYOUT_UNKNOWN)
-            g_v2000_sus_path_layout = first;
-
-        prt_not_supported(cmd, ret);
-    } else if (HAVE(154)) {
-        struct sus_path_v154 info = {0};
-        strncpy(info.target_pathname, path, SUSFS_MAX_LEN_PATHNAME - 1);
-        info.target_ino = sb.st_ino;
-        info.i_uid      = sb.st_uid;
-        ret = prctl_cmd(cmd, &info);
-        prt_not_supported(cmd, ret);
+        /* Old struct layout (has target_ino and i_uid) */
+        {
+            struct stat sb;
+            if (get_file_stat(path, &sb)) {
+                printf("[-] Failed to stat '%s'\n", path);
+                return 1;
+            }
+            struct sus_path_v2000 info = {0};
+            strncpy(info.target_pathname, path, SUSFS_MAX_LEN_PATHNAME - 1);
+            info.target_ino = sb.st_ino;
+            info.i_uid      = sb.st_uid;
+            info.err        = ERR_v2000_CMD_NOT_SUPPORTED;
+            v2000_cmd(cmd, &info);
+            if (info.err == 0) {
+                g_v2000_sus_path_layout = V2000_SUS_PATH_LAYOUT_OLD;
+                persist_old_sus_path_layout_cache();
+            }
+            prt_not_supported(cmd, info.err);
+            ret = info.err;
+        }
     } else {
-        struct sus_path_v1 info = {0};
-        strncpy(info.target_pathname, path, SUSFS_MAX_LEN_PATHNAME - 1);
-        info.target_ino = sb.st_ino;
-        ret = prctl_cmd(cmd, &info);
-        prt_not_supported(cmd, ret);
+        struct stat sb;
+        if (get_file_stat(path, &sb)) {
+            printf("[-] Failed to stat '%s'\n", path);
+            return 1;
+        }
+        if (HAVE(154)) {
+            struct sus_path_v154 info = {0};
+            strncpy(info.target_pathname, path, SUSFS_MAX_LEN_PATHNAME - 1);
+            info.target_ino = sb.st_ino;
+            info.i_uid      = sb.st_uid;
+            ret = prctl_cmd(cmd, &info);
+            prt_not_supported(cmd, ret);
+        } else {
+            struct sus_path_v1 info = {0};
+            strncpy(info.target_pathname, path, SUSFS_MAX_LEN_PATHNAME - 1);
+            info.target_ino = sb.st_ino;
+            ret = prctl_cmd(cmd, &info);
+            prt_not_supported(cmd, ret);
+        }
     }
     return ret;
 }
@@ -1454,6 +1496,7 @@ static int cmd_sus_su(const char *arg) {
 int main(int argc, char *argv[]) {
     pre_check();
     detect_susfs_version();
+    load_sus_path_layout_cache();
 
     if (argc < 2) {
         print_help();
