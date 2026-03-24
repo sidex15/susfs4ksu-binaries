@@ -771,10 +771,26 @@ static int print_more_help(const char *cmd) {
         return 0;
     }
     if (strcmp(cmd, "add_open_redirect") == 0) {
-        printf("    add_open_redirect </target/path> </redirected/path>\n");
-        printf("      |--> Redirect the target path to be opened with user defined path\n");
-        printf("      * Important Notes *\n");
-        printf("      - Only effective for current process with uid <= 2000 or uid <= 11000 (for modified susfs kernels)\n");
+        if (HAVE(2100)) {
+            printf("    add_open_redirect </target/path> </redirected/path> <uid_scheme>\n");
+            printf("      |--> Redirect the target path to be opened with user defined path and pre-defined uid scheme\n");
+            printf("      |--> <uid_scheme>\n");
+            printf("           |--> 0: Effective for non-app processes (uid < 10000)\n");
+            printf("           |--> 1: Effective for non-su processes of which uid is 0 (All root process but not with su domain)\n");
+            printf("           |--> 2: Effective for non-su processes (Use it carefully!)\n");
+            printf("           |--> 3: Effective for processes that are marked umounted with uid >= 10000 (Use it carefully!)\n");
+            printf("           |--> 4: Effective for processes that are marked umounted (include most of the init spawned process, use it carefully!)\n");
+            printf("      * Important Notes *\n");
+            printf("      - Both target_pathname and redirected_pathname must be existed before they can be added to open_redirect\n");
+            printf("      - Users have to take care of the selinux permission of both target_pathname and redirected_pathname by themselves\n");
+            printf("      - Only effective for current process that matches the pre-defined uid scheme\n");
+        }
+        else {
+            printf("    add_open_redirect </target/path> </redirected/path>\n");
+            printf("      |--> Redirect the target path to be opened with user defined path\n");
+            printf("      * Important Notes *\n");
+            printf("      - Only effective for current process with uid <= 2000 or uid <= 11000 (for modified susfs kernels)\n");
+        }
         return 0;
     }
     if (strcmp(cmd, "add_sus_map") == 0) {
