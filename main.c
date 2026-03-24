@@ -1372,7 +1372,7 @@ static int cmd_add_open_redirect_2100(const char *target, const char *redirect, 
         return -EINVAL;
     }
 
-    if (uid_scheme < UID_ROOT_PROC_EXCEPT_SU_PROC || uid_scheme > UID_UMOUNTED_PROC) {
+    if (uid_scheme < UID_NON_APP_PROC || uid_scheme > UID_UMOUNTED_PROC) {
         print_help();
         return -EINVAL;
     }
