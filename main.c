@@ -1023,7 +1023,6 @@ static int parse_kstat_argv(char **argv, struct stat *sb, int *flags) {
         if (*ep) return 1; \
         sb->field = _v; \
     }
-    if (flags) *flags = 0;
     if (strcmp(argv[4], "default")) {
         MAYBE_UL(4, st_dev)
         if (flags && HAVE(2100)) *flags |= KSTAT_SPOOF_DEV;
