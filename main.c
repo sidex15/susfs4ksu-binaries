@@ -220,7 +220,7 @@ struct sus_path_v2000_new {
 };
 
 static void load_sus_path_layout_cache(void) {
-    if (g_abi != ABI_v2000)
+    if ((g_abi != ABI_v2000) || HAVE(2100))
         return;
     if (access(SUS_PATH_LAYOUT_OLD_MARKER, F_OK) == 0)
         g_v2000_sus_path_layout = V2000_SUS_PATH_LAYOUT_OLD;
@@ -527,25 +527,6 @@ static void copy_stat_to_kstat_v2100(struct sus_kstat_v2100 *k, const struct sta
     k->spoofed_ctime_tv_nsec = sb->st_ctimensec;
     k->spoofed_blocks        = sb->st_blocks;
     k->spoofed_blksize       = sb->st_blksize;
-}
-
-/* Dispatch CMD_SUSFS_ADD_SUS_PATH[_LOOP] with either old or new v2.0.0 layout. */
-static int v2000_cmd_sus_path(unsigned long cmd, const char *path, const struct stat *sb, int layout) {
-    if (layout == V2000_SUS_PATH_LAYOUT_NEW) {
-        struct sus_path_v2000_new info = {0};
-        strncpy(info.target_pathname, path, SUSFS_MAX_LEN_PATHNAME - 1);
-        info.err = ERR_v2000_CMD_NOT_SUPPORTED;
-        v2000_cmd(cmd, &info);
-        return info.err;
-    }
-
-    struct sus_path_v2000 info = {0};
-    strncpy(info.target_pathname, path, SUSFS_MAX_LEN_PATHNAME - 1);
-    info.target_ino = sb->st_ino;
-    info.i_uid      = sb->st_uid;
-    info.err        = ERR_v2000_CMD_NOT_SUPPORTED;
-    v2000_cmd(cmd, &info);
-    return info.err;
 }
 
 /* Read a file into a malloc'd buffer (null-terminated). Caller must free(). */
@@ -858,7 +839,7 @@ static int cmd_add_sus_path(const char *path, bool loop) {
 
     if (g_abi == ABI_v2000) {
         /* Try new struct layout first (or use cached result) */
-        if (g_v2000_sus_path_layout != V2000_SUS_PATH_LAYOUT_OLD) {
+        if ((g_v2000_sus_path_layout != V2000_SUS_PATH_LAYOUT_OLD) || HAVE(2100)) {
             struct sus_path_v2000_new info = {0};
             strncpy(info.target_pathname, path, SUSFS_MAX_LEN_PATHNAME - 1);
             info.err = ERR_v2000_CMD_NOT_SUPPORTED;
@@ -869,10 +850,7 @@ static int cmd_add_sus_path(const char *path, bool loop) {
                 prt_not_supported(cmd, info.err);
                 return info.err;
             }
-            /* New layout failed and not yet cached — fall through to old layout */
-        }
-        /* Old struct layout (has target_ino and i_uid) */
-        {
+        } else { /* New layout failed and not yet cached — fall through to old layout */
             struct stat sb;
             if (get_file_stat(path, &sb)) {
                 printf("[-] Failed to stat '%s'\n", path);
