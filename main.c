@@ -1724,7 +1724,7 @@ int main(int argc, char *argv[]) {
     }
 
     if (!strcmp(cmd, "umount_for_zygote_iso_service") && argc == 3) {
-        if (!HAVE(1510)) { printf("[-] Requires susfs v1.5.10+\n"); return 1; }
+        if (!HAVE(159)) { printf("[-] Requires susfs v1.5.9+\n"); return 1; }
         if (strcmp(argv[2], "0") && strcmp(argv[2], "1")) { print_help(); return 1; }
         return cmd_umount_zygote_iso(atoi(argv[2]));
     }
