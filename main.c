@@ -417,26 +417,36 @@ static void prt_not_supported(unsigned long cmd, int err) {
  ****************************/
 
 /*
- * Parse "X.Y.Z" into internal version integer:
- *   1.5.2  -> 152,  1.5.9  -> 159,
- *   1.5.10 -> 1510, 1.5.11 -> 1510, 1.5.12 -> 1512
- *   2.0.0  -> 2000
- * Versions 1.5.4-1.5.7 are all treated as 154.
+ * Maps a parsed "X.Y.Z" to the internal ABI bucket it belongs to.
+ * Ordered newest -> oldest; the first entry whose (major, minor, patch_min)
+ * is satisfied is the bucket used. This means any version newer than the
+ * newest known entry (e.g. a future v2.2.0 or v3.0.0) falls through to that
+ * newest bucket instead of being mis-routed into an older version's logic.
  */
+static const struct { int major, minor, patch_min, bucket; } g_version_table[] = {
+    { 2, 1, 0,  2100 },
+    { 2, 0, 0,  2000 },
+    { 1, 5, 12, 1512 },
+    { 1, 5, 10, 1510 },   /* covers 1.5.10 and 1.5.11 */
+    { 1, 5, 9,  159  },
+    { 1, 5, 8,  158  },
+    { 1, 5, 4,  154  },   /* covers 1.5.4 - 1.5.7 */
+    { 1, 5, 3,  153  },
+    { 1, 5, 2,  152  },
+};
+
 static int parse_version_string(const char *s) {
     int ma = 0, mi = 0, pa = 0;
     if (sscanf(s, "v%d.%d.%d", &ma, &mi, &pa) != 3)
         return 0;
-    if ((ma == 2) && (mi == 1)) return 2100;
-    if ((ma == 2) && (mi == 0)) return 2000;
-    /* 1.5.x */
-    if (pa >= 12) return 1512;
-    if (pa >= 10) return 1510;   /* covers 1.5.10 and 1.5.11 */
-    if (pa == 9)  return 159;
-    if (pa == 8)  return 158;
-    if (pa >= 4)  return 154;    /* covers 1.5.4 - 1.5.7 */
-    if (pa == 3)  return 153;
-    if (pa == 2)  return 152;
+
+    for (size_t i = 0; i < sizeof(g_version_table) / sizeof(g_version_table[0]); i++) {
+        const __typeof__(g_version_table[0]) *b = &g_version_table[i];
+        if (ma > b->major ||
+            (ma == b->major && mi > b->minor) ||
+            (ma == b->major && mi == b->minor && pa >= b->patch_min))
+            return b->bucket;
+    }
     return 154; /* safe fallback */
 }
 
