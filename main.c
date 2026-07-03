@@ -435,6 +435,65 @@ static const struct { int major, minor, patch_min, bucket; } g_version_table[] =
     { 1, 5, 2,  152  },
 };
 
+/*
+ * Bit-position -> CONFIG_KSU_SUSFS_* name tables for the v1.5.3-v1.5.8 bucket,
+ * where CMD_SUSFS_SHOW_ENABLED_FEATURES returns an integer bitmask instead of
+ * a human-readable string. Bit positions are stable across these versions,
+ * but the feature set at each bit differs, hence one table per version.
+ */
+static const char *g_feature_names_153[] = {
+    "CONFIG_KSU_SUSFS_SUS_PATH",
+    "CONFIG_KSU_SUSFS_SUS_MOUNT",
+    "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT",
+    "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT",
+    "CONFIG_KSU_SUSFS_SUS_KSTAT",
+    "CONFIG_KSU_SUSFS_SUS_OVERLAYFS",
+    "CONFIG_KSU_SUSFS_TRY_UMOUNT",
+    "CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT",
+    "CONFIG_KSU_SUSFS_SPOOF_UNAME",
+    "CONFIG_KSU_SUSFS_ENABLE_LOG",
+    "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS",
+    "CONFIG_KSU_SUSFS_SPOOF_BOOTCONFIG",
+    "CONFIG_KSU_SUSFS_OPEN_REDIRECT",
+    "CONFIG_KSU_SUSFS_SUS_SU",
+    NULL
+};
+static const char *g_feature_names_154[] = {
+    "CONFIG_KSU_SUSFS_SUS_PATH",
+    "CONFIG_KSU_SUSFS_SUS_MOUNT",
+    "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT",
+    "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT",
+    "CONFIG_KSU_SUSFS_SUS_KSTAT",
+    "CONFIG_KSU_SUSFS_SUS_OVERLAYFS",
+    "CONFIG_KSU_SUSFS_TRY_UMOUNT",
+    "CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT",
+    "CONFIG_KSU_SUSFS_SPOOF_UNAME",
+    "CONFIG_KSU_SUSFS_ENABLE_LOG",
+    "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS",
+    "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG",
+    "CONFIG_KSU_SUSFS_OPEN_REDIRECT",
+    "CONFIG_KSU_SUSFS_SUS_SU",
+    "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT",
+    NULL
+};
+static const char *g_feature_names_158[] = {
+    "CONFIG_KSU_SUSFS_SUS_PATH",
+    "CONFIG_KSU_SUSFS_SUS_MOUNT",
+    "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT",
+    "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT",
+    "CONFIG_KSU_SUSFS_SUS_KSTAT",
+    "CONFIG_KSU_SUSFS_TRY_UMOUNT",
+    "CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT",
+    "CONFIG_KSU_SUSFS_SPOOF_UNAME",
+    "CONFIG_KSU_SUSFS_ENABLE_LOG",
+    "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS",
+    "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG",
+    "CONFIG_KSU_SUSFS_OPEN_REDIRECT",
+    "CONFIG_KSU_SUSFS_SUS_SU",
+    "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT",
+    NULL
+};
+
 static int parse_version_string(const char *s) {
     int ma = 0, mi = 0, pa = 0;
     if (sscanf(s, "v%d.%d.%d", &ma, &mi, &pa) != 3)
@@ -477,6 +536,82 @@ static void detect_susfs_version(void) {
     g_abi     = ABI_PRCTL;
     g_version = 152;
     g_version_string = strdup("v1.5.2");
+}
+
+/*
+ * Returns a newline-joined, malloc'd string of the CONFIG_KSU_SUSFS_* names
+ * currently enabled in the kernel, or NULL if the kernel has no
+ * SHOW_ENABLED_FEATURES command (pre-v1.5.3) or the query failed. Fetched
+ * once and cached for the life of the process.
+ */
+static char *get_enabled_features_string(void) {
+    static char *cache = NULL;
+    static bool  fetched = false;
+    if (fetched)
+        return cache;
+    fetched = true;
+
+    if (g_abi == ABI_v2000) {
+        struct enabled_features_v2000 info = {0};
+        info.err = ERR_v2000_CMD_NOT_SUPPORTED;
+        v2000_cmd(CMD_SUSFS_SHOW_ENABLED_FEATURES, &info);
+        if (!info.err)
+            cache = strdup(info.enabled_features);
+    } else if (HAVE(159)) {
+        size_t bufsz = (size_t)getpagesize() * 2;
+        char *buf = malloc(bufsz);
+        if (buf) {
+            int r = prctl_cmd4(CMD_SUSFS_SHOW_ENABLED_FEATURES, buf, (unsigned long)bufsz);
+            if (!r)
+                cache = buf;
+            else
+                free(buf);
+        }
+    } else if (HAVE(153)) {
+        /* v1.5.3-v1.5.8: kernel returns an integer bitmask, decode via name tables */
+        unsigned long mask = 0;
+        int r = prctl_cmd(CMD_SUSFS_SHOW_ENABLED_FEATURES, &mask);
+        if (!r) {
+            const char **names = (g_version == 153) ? g_feature_names_153
+                                : (g_version == 154) ? g_feature_names_154
+                                : g_feature_names_158;
+            size_t cap = 4096, len = 0;
+            char *buf = malloc(cap);
+            if (buf) {
+                buf[0] = '\0';
+                for (int bit = 0; names[bit]; bit++) {
+                    if (!(mask & (1UL << bit)))
+                        continue;
+                    size_t need = strlen(names[bit]) + 2;
+                    if (len + need > cap) {
+                        cap *= 2;
+                        char *grown = realloc(buf, cap);
+                        if (!grown) { free(buf); buf = NULL; break; }
+                        buf = grown;
+                    }
+                    len += (size_t)sprintf(buf + len, "%s\n", names[bit]);
+                }
+                cache = buf;
+            }
+        }
+    }
+    return cache;
+}
+
+/* True when the kernel reports the given CONFIG_KSU_SUSFS_* feature as enabled. */
+static bool have_susfs_feature(const char *feature) {
+    const char *features = get_enabled_features_string();
+    if (!features)
+        return false;
+
+    size_t flen = strlen(feature);
+    for (const char *p = features; (p = strstr(p, feature)) != NULL; p += flen) {
+        bool start_ok = (p == features) || !(isalnum((unsigned char)p[-1]) || p[-1] == '_');
+        bool end_ok   = !isalnum((unsigned char)p[flen]) && p[flen] != '_';
+        if (start_ok && end_ok)
+            return true;
+    }
+    return false;
 }
 
 /********************
@@ -572,7 +707,7 @@ static void print_help(void) {
                g_abi == ABI_v2000 ? "sys_reboot" : "prctl");
     printf("\n  <CMD>:\n");
     printf("    add_sus_path </path>\n");
-    if (HAVE(1510))
+    if (HAVE(1510) || have_susfs_feature("CONFIG_KSU_SUSFS_SUS_PATH"))
         printf("    add_sus_path_loop </path>\n");
     if (HAVE(158)) {
         printf("    set_android_data_root_path </path/to/Android/data>\n");
@@ -584,7 +719,7 @@ static void print_help(void) {
     else {
         printf("    add_sus_mount <mounted_path>\n");
     }
-    if (HAVE(158) && g_abi == ABI_PRCTL)
+    if ((HAVE(158) || have_susfs_feature("CONFIG_KSU_SUSFS_SUS_MOUNT")) && g_abi == ABI_PRCTL)
         printf("    hide_sus_mnts_for_all_procs <0|1>\n");
     if (g_abi == ABI_v2000)
         printf("    hide_sus_mnts_for_non_su_procs <0|1>\n");
@@ -601,7 +736,7 @@ static void print_help(void) {
         printf("    run_try_umount\n");
     printf("    set_uname <release> <version>  (pass 'default' for either)\n");
     printf("    enable_log <0|1>\n");
-    if (g_version == 152 || g_version == 153)
+    if (!HAVE(154))
         printf("    set_bootconfig </path/to/file>\n");
     if (HAVE(154))
         printf("    set_cmdline_or_bootconfig </path/to/file>\n");
@@ -1479,62 +1614,12 @@ static int cmd_show(const char *what) {
             if (r) return r;
 
             /*
-                * The bit positions for features are stable across these versions, but the features themselves may differ.
-                 * So we prepare the names for all versions and print according to the version.
+             * The bit positions for features are stable across these versions, but the
+             * features themselves may differ, hence one name table per version.
              */
-            const char *names_153[] = {
-                "CONFIG_KSU_SUSFS_SUS_PATH",
-                "CONFIG_KSU_SUSFS_SUS_MOUNT",
-                "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT",
-                "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT",
-                "CONFIG_KSU_SUSFS_SUS_KSTAT",
-                "CONFIG_KSU_SUSFS_SUS_OVERLAYFS",
-                "CONFIG_KSU_SUSFS_TRY_UMOUNT",
-                "CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT",
-                "CONFIG_KSU_SUSFS_SPOOF_UNAME",
-                "CONFIG_KSU_SUSFS_ENABLE_LOG",
-                "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS",
-                "CONFIG_KSU_SUSFS_SPOOF_BOOTCONFIG",
-                "CONFIG_KSU_SUSFS_OPEN_REDIRECT",
-                "CONFIG_KSU_SUSFS_SUS_SU",
-                NULL
-            };
-            const char *names_154[] = {
-                "CONFIG_KSU_SUSFS_SUS_PATH",
-                "CONFIG_KSU_SUSFS_SUS_MOUNT",
-                "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT",
-                "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT",
-                "CONFIG_KSU_SUSFS_SUS_KSTAT",
-                "CONFIG_KSU_SUSFS_SUS_OVERLAYFS",
-                "CONFIG_KSU_SUSFS_TRY_UMOUNT",
-                "CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT",
-                "CONFIG_KSU_SUSFS_SPOOF_UNAME",
-                "CONFIG_KSU_SUSFS_ENABLE_LOG",
-                "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS",
-                "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG",
-                "CONFIG_KSU_SUSFS_OPEN_REDIRECT",
-                "CONFIG_KSU_SUSFS_SUS_SU",
-                "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT",
-                NULL
-            };
-            const char *names_158[] = {
-                "CONFIG_KSU_SUSFS_SUS_PATH",
-                "CONFIG_KSU_SUSFS_SUS_MOUNT",
-                "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT",
-                "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT",
-                "CONFIG_KSU_SUSFS_SUS_KSTAT",
-                "CONFIG_KSU_SUSFS_TRY_UMOUNT",
-                "CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT",
-                "CONFIG_KSU_SUSFS_SPOOF_UNAME",
-                "CONFIG_KSU_SUSFS_ENABLE_LOG",
-                "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS",
-                "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG",
-                "CONFIG_KSU_SUSFS_OPEN_REDIRECT",
-                "CONFIG_KSU_SUSFS_SUS_SU",
-                "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT",
-                NULL
-            };
-            const char **names = (g_version == 153) ? names_153 : (g_version == 154) ? names_154 : names_158;
+            const char **names = (g_version == 153) ? g_feature_names_153
+                                : (g_version == 154) ? g_feature_names_154
+                                : g_feature_names_158;
             for (int bit = 0; names[bit]; bit++)
                 if (mask & (1UL << bit))
                     printf("%s\n", names[bit]);
