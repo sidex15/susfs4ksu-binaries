@@ -54,6 +54,8 @@ void print_help(void) {
     printf("    add_open_redirect </target> </redirect>\n");
     if (HAVE(1512))
         printf("    add_sus_map </path/to/library>\n");
+    if (have_susfs_feature("CONFIG_KSU_SUSFS_SUS_MEMFD"))
+        printf("    add_sus_memfd <memfd_name>\n");
     if (HAVE(1510))
         printf("    enable_avc_log_spoofing <0|1>\n");
     if (HAVE(153))
@@ -237,6 +239,12 @@ int print_more_help(const char *cmd) {
         printf("      - It may not be able to evade detections by apps that implement a good injection detection\n");
         printf("      - Only effective for umounted process with uid >= 10000\n");
         return 0;
+    }
+    if (strcmp(cmd, "add_sus_memfd") == 0) {
+        printf("    add_sus_memfd <memfd_name>\n");
+        printf("     |--> NOTE: This feature will be effective on all process\n");
+        printf("     |--> NOTE: Remeber to prepend 'memfd:' to <memfd_name>\n");
+        printf("     |--> e.g., add_sus_memfd 'memfd:/jit-cache'\n");
     }
     if (strcmp(cmd, "enable_avc_log_spoofing") == 0) {
         printf("    enable_avc_log_spoofing <0|1>\n");

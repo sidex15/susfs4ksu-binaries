@@ -591,6 +591,29 @@ int cmd_add_sus_map(const char *path) {
 }
 
 /* ------------------------------------------------------------------ */
+/* add_sus_memfd (exclusive feature)                                  */
+/* ------------------------------------------------------------------ */
+
+int cmd_add_sus_memfd(const char *path){
+	int ret;
+    if (g_abi == ABI_v2000) {
+        struct sus_memfd_v2000 info = {0};
+        strncpy(info.target_pathname, path, SUSFS_MAX_LEN_PATHNAME - 1);
+        info.err = ERR_v2000_CMD_NOT_SUPPORTED;
+        v2000_cmd(CMD_SUSFS_ADD_SUS_MEMFD, &info);
+        prt_not_supported(CMD_SUSFS_ADD_SUS_MEMFD, info.err);
+        ret = info.err;
+    } else {
+        struct sus_memfd_v1 info = {0};
+        strncpy(info.target_pathname, path, SUSFS_MAX_LEN_PATHNAME - 1);
+        ret = prctl_cmd(CMD_SUSFS_ADD_SUS_MEMFD, &info);
+        prt_not_supported(CMD_SUSFS_ADD_SUS_MEMFD, ret);
+        return ret;
+    }
+    return ret;
+}
+
+/* ------------------------------------------------------------------ */
 /* enable_avc_log_spoofing (v1.5.10+)                                  */
 /* ------------------------------------------------------------------ */
 int cmd_enable_avc_log_spoofing(int enabled) {

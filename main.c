@@ -134,6 +134,14 @@ int main(int argc, char *argv[]) {
         return cmd_add_sus_map(argv[2]);
     }
 
+    if (!strcmp(cmd, "add_sus_memfd") && argc == 3) {
+        if (!have_susfs_feature("CONFIG_KSU_SUSFS_SUS_MEMFD")){
+            printf("[-] Requires CONFIG_KSU_SUSFS_SUS_MEMFD kernel feature\n");
+            return 1;
+        }
+        return cmd_add_sus_memfd(argv[2]);
+    }
+
     if (!strcmp(cmd, "enable_avc_log_spoofing") && argc == 3) {
         if (!HAVE(1510)) { printf("[-] Requires susfs v1.5.10+\n"); return 1; }
         if (strcmp(argv[2], "0") && strcmp(argv[2], "1")) { print_help(); return 1; }

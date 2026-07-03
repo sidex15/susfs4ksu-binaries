@@ -61,6 +61,7 @@
 #define CMD_SUSFS_SUS_SU                         0x60000
 #define CMD_SUSFS_ENABLE_AVC_LOG_SPOOFING        0x60010
 #define CMD_SUSFS_ADD_SUS_MAP                    0x60020
+#define CMD_SUSFS_ADD_SUS_MEMFD                  0x60030 /* Exclusive feature based on v1.3.8 susfs*/
 
 /* v2.1.0 new kstat definitions */
 #define KSTAT_SPOOF_INO (1 << 0)
@@ -339,6 +340,16 @@ struct version_v2000 {
     int     err;
 };
 
+/* sus_memfd exclusive feature */
+struct sus_memfd_v1 {
+	char                    target_pathname[SUSFS_MAX_LEN_PATHNAME];
+};
+
+struct sus_memfd_v2000 {
+	char                    target_pathname[SUSFS_MAX_LEN_PATHNAME];
+    int                     err;
+};
+
 /***************************
  ** Low-level IPC helpers **
  ** (src/ipc/ipc.c)        **
@@ -419,6 +430,7 @@ int cmd_set_cmdline_or_bootconfig(const char *filepath);
 int cmd_add_open_redirect(const char *target, const char *redirect);
 int cmd_add_open_redirect_2100(const char *target, const char *redirect, const char *uid);
 int cmd_add_sus_map(const char *path);
+int cmd_add_sus_memfd(const char *path);
 int cmd_enable_avc_log_spoofing(int enabled);
 int cmd_show(const char *what);
 int cmd_sus_su(const char *arg);
