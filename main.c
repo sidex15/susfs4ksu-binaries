@@ -36,12 +36,12 @@ int main(int argc, char *argv[]) {
     }
 
     if (!strcmp(cmd, "set_android_data_root_path") && argc == 3) {
-        if (!HAVE(158)) { printf("[-] Requires susfs v1.5.8+\n"); return 1; }
+        if (!HAVE(158) || HAVE(2100)) { printf("[-] Requires susfs v1.5.8-v2.0.0\n"); return 1; }
         return cmd_set_external_dir(argv[2], CMD_SUSFS_SET_ANDROID_DATA_ROOT_PATH);
     }
 
     if (!strcmp(cmd, "set_sdcard_root_path") && argc == 3) {
-        if (!HAVE(158)) { printf("[-] Requires susfs v1.5.8+\n"); return 1; }
+        if (!HAVE(158) || HAVE(2100)) { printf("[-] Requires susfs v1.5.8-v2.0.0\n"); return 1; }
         return cmd_set_external_dir(argv[2], CMD_SUSFS_SET_SDCARD_ROOT_PATH);
     }
 

@@ -83,7 +83,7 @@ int cmd_add_sus_path(const char *path, bool loop) {
 }
 
 /* ------------------------------------------------------------------ */
-/* set_android_data_root_path / set_sdcard_root_path (v1.5.8+)        */
+/* set_android_data_root_path / set_sdcard_root_path (v1.5.8-v2.0.0)        */
 /* ------------------------------------------------------------------ */
 int cmd_set_external_dir(const char *path, unsigned long cmd) {
     int ret;

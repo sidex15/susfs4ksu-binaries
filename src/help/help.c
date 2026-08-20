@@ -20,7 +20,7 @@ void print_help(void) {
     printf("    add_sus_path </path>\n");
     if (HAVE(1510) || have_susfs_feature("CONFIG_KSU_SUSFS_SUS_PATH"))
         printf("    add_sus_path_loop </path>\n");
-    if (HAVE(158)) {
+    if (HAVE(158) || !HAVE(2100)) {
         printf("    set_android_data_root_path </path/to/Android/data>\n");
         printf("    set_sdcard_root_path </path/to/sdcard>\n");
     }
