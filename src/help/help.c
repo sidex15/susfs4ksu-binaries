@@ -118,7 +118,14 @@ int print_more_help(const char *cmd) {
 	    printf("      |--> 1 -> hide all sus mounts for non-su processes\n");
 	    printf("      * Important Notes *\n");
 	    printf("      - It is set to 0 in kernel by default\n");
-	    printf("      - For ReZygisk without TreatWheel module, it is recommended to set to 1 in post-fs-data.sh to prevent zygote from caching the sus mounts in memory, and revert to 0 in boot-completed.sh stage, or keep it enabled if you want to keep them hidden from /proc/self/[mounts|mountinfo|mountstat] for non-su processes\n");
+        if (HAVE(2300)) {
+            printf("      - It is set to 0 in kernel by default, but it is a MUST now to have it enabled all the time\n");
+            printf("        because of the zygote_next exploit. It is also required if kernel_umount is disabled in KSU manager\n");
+        }
+        else {
+            printf("      - It is set to 0 in kernel by default\n");
+            printf("      - For ReZygisk without TreatWheel module, it is recommended to set to 1 in post-fs-data.sh to prevent zygote from caching the sus mounts in memory, and revert to 0 in boot-completed.sh stage, or keep it enabled if you want to keep them hidden from /proc/self/[mounts|mountinfo|mountstat] for non-su processes\n");
+        }
         return 0;
     }
     if (strcmp(cmd, "umount_for_zygote_iso_service") == 0) {
@@ -145,7 +152,12 @@ int print_more_help(const char *cmd) {
         printf("                    '1712592355' 'default' '1712592355' 'default' '1712592355' 'default'\\\n");
         printf("                    'default' 'default'\n");
         printf("      * Important Notes *\n");
-	    printf("      - Only effective for umounted process with uid >= 10000\n");
+	    if (HAVE(2300)){
+            printf("      - Effective for all processes with uid >= 10000\n");
+        }
+        else {
+            printf("      - Only effective for umounted process with uid >= 10000\n");
+        }
         return 0;
     }
     if (strcmp(cmd, "add_sus_kstat") == 0) {
@@ -153,7 +165,12 @@ int print_more_help(const char *cmd) {
         printf("      |--> Add the desired path BEFORE it gets bind mounted or overlayed, this is used for storing original stat info in kernel memory\n");
         printf("      |--> This command must be completed with <update_sus_kstat> later after the added path is bind mounted or overlayed\n");
         printf("      * Important Notes *\n");
-        printf("      - Only effective for umounted process with uid >= 10000\n");
+        if (HAVE(2300)){
+            printf("      - Effective for all processes with uid >= 10000\n");
+        }
+        else {
+            printf("      - Only effective for umounted process with uid >= 10000\n");
+        }
         return 0;
     }
     if (strcmp(cmd, "update_sus_kstat") == 0) {
@@ -161,7 +178,12 @@ int print_more_help(const char *cmd) {
         printf("      |--> Add the desired path you have added before via <add_sus_kstat> to complete the kstat spoofing procedure\n");
         printf("      |--> This updates the target ino, but size and blocks are remained the same as current stat\n");
         printf("      * Important Notes *\n");
-        printf("      - Only effective for umounted process with uid >= 10000\n");
+        if (HAVE(2300)){
+            printf("      - Effective for all processes with uid >= 10000\n");
+        }
+        else {
+            printf("      - Only effective for umounted process with uid >= 10000\n");
+        }
         return 0;
     }
     if (strcmp(cmd, "update_sus_kstat_full_clone") == 0) {
@@ -169,7 +191,12 @@ int print_more_help(const char *cmd) {
         printf("      |--> Add the desired path you have added before via <add_sus_kstat> to complete the kstat spoofing procedure\n");
         printf("      |--> This updates the target ino only, other stat members are remained the same as the original stat\n");
         printf("      * Important Notes *\n");
-        printf("      - Only effective for umounted process with uid >= 10000\n");
+        if (HAVE(2300)){
+            printf("      - Effective for all processes with uid >= 10000\n");
+        }
+        else {
+            printf("      - Only effective for umounted process with uid >= 10000\n");
+        }
         return 0;
     }
     if (strcmp(cmd, "add_try_umount") == 0) {

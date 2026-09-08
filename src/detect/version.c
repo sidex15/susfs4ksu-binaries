@@ -31,6 +31,7 @@ int   g_v2000_sus_path_layout = V2000_SUS_PATH_LAYOUT_UNKNOWN;
  * newest bucket instead of being mis-routed into an older version's logic.
  */
 static const struct { int major, minor, patch_min, bucket; } g_version_table[] = {
+    { 2, 3, 0,  2300 },
     { 2, 1, 0,  2100 },
     { 2, 0, 0,  2000 },
     { 1, 5, 12, 1512 },
