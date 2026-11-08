@@ -161,6 +161,11 @@ int main(int argc, char *argv[]) {
         return cmd_sus_su(argv[2]);
     }
 
+    if (!strcmp(cmd, "set_priority_uid_filter") && argc == 3) {
+        if (!HAVE(2400)) { printf("[-] Requires susfs v2.4.0+\n"); return 1; }
+        return set_priority_uid_filter(argv[2]);
+    }
+
     print_help();
     free(g_version_string);
     return 254;

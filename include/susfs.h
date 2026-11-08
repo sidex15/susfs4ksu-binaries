@@ -61,7 +61,8 @@
 #define CMD_SUSFS_SUS_SU                         0x60000
 #define CMD_SUSFS_ENABLE_AVC_LOG_SPOOFING        0x60010
 #define CMD_SUSFS_ADD_SUS_MAP                    0x60020
-#define CMD_SUSFS_ADD_SUS_MEMFD                  0x60030 /* Exclusive feature based on v1.3.8 susfs*/
+#define CMD_SUSFS_ADD_SUS_MEMFD                  0x60090 /* Exclusive feature based on v1.3.8 susfs*/
+#define CMD_SUSFS_SET_PRIORITY_UID_FILTER        0x60030 /* v2.4.0+ */
 
 /* v2.1.0 new kstat definitions */
 #define KSTAT_SPOOF_INO (1 << 0)
@@ -121,6 +122,9 @@ extern int g_v2000_sus_path_layout;
 
 /* True when the running kernel supports the given minimum version integer. */
 #define HAVE(v)  (g_version >= (v))
+
+/* The maximum size of the app package names buffer, which is the maximum value of a u16 */
+#define APP_STR_BUF_SIZE 65535
 
 /***************************
  ** Struct definitions     **
@@ -350,6 +354,12 @@ struct sus_memfd_v2000 {
     int                     err;
 };
 
+struct st_susfs_priority_uid_filter {
+	char                    app_strings[APP_STR_BUF_SIZE];
+	int                     err;
+};
+
+
 /***************************
  ** Low-level IPC helpers **
  ** (src/ipc/ipc.c)        **
@@ -434,5 +444,6 @@ int cmd_add_sus_memfd(const char *path);
 int cmd_enable_avc_log_spoofing(int enabled);
 int cmd_show(const char *what);
 int cmd_sus_su(const char *arg);
+int set_priority_uid_filter(const char *pkgname);
 
 #endif /* KSU_SUSFS_H */

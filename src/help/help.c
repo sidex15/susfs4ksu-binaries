@@ -60,6 +60,8 @@ void print_help(void) {
         printf("    enable_avc_log_spoofing <0|1>\n");
     if (HAVE(153))
         printf("    show <version|enabled_features|variant>\n");
+    if (HAVE(2400))
+        printf("    set_priority_uid_filter <app1,app2,...>\n");
     if (g_abi == ABI_PRCTL)
         printf("    sus_su <0|2|show_working_mode>\n");
     printf("\n");
@@ -306,6 +308,15 @@ int print_more_help(const char *cmd) {
         printf("         |--> 1: (deprecated), disable the core ksu kprobe hooks and enable sus_su fifo driver\n");
         printf("         |--> 2: disable the core ksu kprobe hooks and enable sus_su just with non-kprobe hooks\n");
         printf("         |--> show_working_mode: show the current sus_su working mode, [0,1,2]\n");
+        return 0;
+    }
+    if (strcmp(cmd, "set_priority_uid_filter")) {
+        printf("    set_priority_uid_filter <app_package_names_separated_by_comma>\n");
+        printf("      |--> The uids of the added apps will be invisible for the apps that are abusing the getpriority/setpriority syscall,\n");
+        printf("      * Important Notes *\n");
+        printf("      - The uids of the apps are resolved from their data paths, hence they are always up to date\n");
+        printf("      - Only effective for all processes with uid >= 10000\n");
+        printf("\n");
         return 0;
     }
 
