@@ -62,6 +62,7 @@ void print_help(void) {
         printf("    show <version|enabled_features|variant>\n");
     if (HAVE(2400))
         printf("    set_priority_uid_filter <app1,app2,...>\n");
+        printf("    set_sus_path_uid_filter <app1,app2,...>\n");
     if (g_abi == ABI_PRCTL)
         printf("    sus_su <0|2|show_working_mode>\n");
     printf("\n");
@@ -317,6 +318,16 @@ int print_more_help(const char *cmd) {
         printf("      - The uids of the apps are resolved from their data paths, hence they are always up to date\n");
         printf("      - Only effective for all processes with uid >= 10000\n");
         printf("\n");
+        return 0;
+    }
+
+    if (strcmp(cmd, "set_sus_path_uid_filter")) {
+        printf("    set_sus_path_uid_filter <app_package_names_separated_by_comma>\n");
+	    printf("      |--> Only uids of added package name will be visible to sus paths, and vice versa\n");
+	    printf("      * Important Notes *\n");
+	    printf("      - App uid is resolved from /data/system/packages.list\n");
+	    printf("      - Only effective for all processes with uid >= 10000\n");
+	    printf("\n");
         return 0;
     }
 
